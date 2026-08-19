@@ -134,7 +134,7 @@ export function PlayerRow({ player }: { player: Player }) {
                 <form onSubmit={handleEliminate} className="space-y-3">
                   <div className="space-y-1.5">
                     <Label>Eliminated by (optional)</Label>
-                    <Select value={eliminatorId ?? undefined} onValueChange={(v) => setEliminatorId(v)}>
+                    <Select value={eliminatorId ?? ""} onValueChange={(v) => setEliminatorId(v || null)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="No credit" />
                       </SelectTrigger>

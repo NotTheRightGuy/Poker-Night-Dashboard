@@ -16,9 +16,21 @@ interface CardPickerProps {
   usedCards: Set<string>; // cards already in play elsewhere this hand — disabled
   onChange: (cards: string[]) => void;
   disabled?: boolean;
+  /** Set false when the caller already renders its own (bigger) card display and only needs the trigger button. */
+  showPreview?: boolean;
+  triggerLabel?: string;
 }
 
-export function CardPicker({ label, max, value, usedCards, onChange, disabled }: CardPickerProps) {
+export function CardPicker({
+  label,
+  max,
+  value,
+  usedCards,
+  onChange,
+  disabled,
+  showPreview = true,
+  triggerLabel,
+}: CardPickerProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>(value);
 
@@ -39,11 +51,12 @@ export function CardPicker({ label, max, value, usedCards, onChange, disabled }:
       }}
     >
       <div className="flex items-center gap-2">
-        {Array.from({ length: max }).map((_, i) =>
-          value[i] ? <PlayingCard key={i} card={value[i]} size="sm" /> : <EmptyCardSlot key={i} size="sm" />,
-        )}
+        {showPreview &&
+          Array.from({ length: max }).map((_, i) =>
+            value[i] ? <PlayingCard key={i} card={value[i]} size="sm" /> : <EmptyCardSlot key={i} size="sm" />,
+          )}
         <DialogTrigger render={<Button type="button" variant="outline" size="sm" disabled={disabled} />}>
-          {value.length > 0 ? "Edit" : "Pick"} {label}
+          {triggerLabel ?? `${value.length > 0 ? "Edit" : "Pick"} ${label}`}
         </DialogTrigger>
       </div>
       <DialogContent className="max-w-md">

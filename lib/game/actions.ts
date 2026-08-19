@@ -138,6 +138,17 @@ export async function clearHoleCards(supabase: Client, handId: string, playerId:
   if (error) throw new Error(error.message);
 }
 
+// Player self-service — always resolves to whichever player this session has
+// claimed, server-side, never a client-supplied player id.
+export async function submitMyHoleCards(supabase: Client, handId: string, cards: [string, string]) {
+  return unwrap(await supabase.rpc("submit_my_hole_cards", { p_hand_id: handId, p_cards: cards }));
+}
+
+export async function clearMyHoleCards(supabase: Client, handId: string) {
+  const { error } = await supabase.rpc("clear_my_hole_cards", { p_hand_id: handId });
+  if (error) throw new Error(error.message);
+}
+
 export async function dealCommunityCards(supabase: Client, handId: string, street: Street, cards: string[]) {
   return unwrap(await supabase.rpc("deal_community_cards", { p_hand_id: handId, p_street: street, p_cards: cards }));
 }

@@ -8,6 +8,12 @@ import { ChipStat, XpStat } from "./stat-pill";
 import { SectionHeading } from "./section-heading";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import type { Player } from "@/lib/game/types";
+
+// Beyond this many players, the oval "physical table" visual stops being
+// readable no matter how small we shrink each seat — a wrapped grid (same
+// layout already used on mobile) scales to any number of players instead.
+const OVAL_TABLE_MAX_PLAYERS = 10;
 
 function seatStyle(index: number, total: number): React.CSSProperties {
   const angle = (2 * Math.PI * index) / total - Math.PI / 2;
@@ -16,6 +22,27 @@ function seatStyle(index: number, total: number): React.CSSProperties {
   const left = 50 + rx * Math.cos(angle);
   const top = 50 + ry * Math.sin(angle);
   return { left: `${left}%`, top: `${top}%` };
+}
+
+function SeatCard({ player, compact, isMe }: { player: Player; compact: boolean; isMe: boolean }) {
+  return (
+    <Link
+      href={`/players/${player.id}`}
+      className={cn(
+        "absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-xl border border-white/10 bg-card/90 text-center backdrop-blur transition hover:border-gold/50",
+        compact ? "p-1.5" : "p-2",
+        player.status === "eliminated" && "opacity-50",
+        isMe && "ring-2 ring-gold",
+      )}
+    >
+      <PlayerAvatar name={player.display_name} size="sm" dimmed={player.status === "eliminated"} />
+      <span className={cn("truncate font-semibold text-foreground", compact ? "max-w-14 text-[0.65rem]" : "max-w-20 text-xs")}>
+        {player.display_name}
+      </span>
+      <PlayerStatusBadge status={player.status} />
+      {!compact && <ChipStat value={player.chip_count} size="sm" />}
+    </Link>
+  );
 }
 
 export function PlayerTable() {
@@ -30,30 +57,33 @@ export function PlayerTable() {
     );
   }
 
+  const total = players.length;
+  const showOvalTable = total <= OVAL_TABLE_MAX_PLAYERS;
+  const compact = total > 6;
+
   return (
     <div>
       <SectionHeading title="At the Table" className="mb-4" />
-      <div className="relative mx-auto aspect-[16/11] w-full max-w-2xl rounded-[50%] border-4 border-gold/25 bg-felt shadow-[inset_0_0_60px_rgba(0,0,0,0.5)] sm:block hidden">
-        {players.map((p, i) => (
-          <Link
-            href={`/players/${p.id}`}
-            key={p.id}
-            style={seatStyle(i, players.length)}
-            className={cn(
-              "absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-xl border border-white/10 bg-card/90 p-2 text-center backdrop-blur transition hover:border-gold/50",
-              p.status === "eliminated" && "opacity-50",
-              myPlayer?.id === p.id && "ring-2 ring-gold",
-            )}
-          >
-            <PlayerAvatar name={p.display_name} size="sm" dimmed={p.status === "eliminated"} />
-            <span className="max-w-20 truncate text-xs font-semibold text-foreground">{p.display_name}</span>
-            <PlayerStatusBadge status={p.status} />
-            <ChipStat value={p.chip_count} size="sm" />
-          </Link>
-        ))}
-      </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:hidden">
+      {showOvalTable && (
+        <div className="relative mx-auto hidden aspect-[16/11] w-full max-w-2xl rounded-[50%] border-4 border-gold/25 bg-felt shadow-[inset_0_0_60px_rgba(0,0,0,0.5)] sm:block">
+          {players.map((p, i) => (
+            <div key={p.id} style={seatStyle(i, total)}>
+              <SeatCard player={p} compact={compact} isMe={myPlayer?.id === p.id} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Wrapped grid — used on mobile always, and on desktop once there are
+          too many players for the oval table to stay readable. Scales to any
+          player count by adding rows/columns, never overlapping. */}
+      <div
+        className={cn(
+          "grid grid-cols-2 gap-2",
+          showOvalTable ? "sm:hidden" : "sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
+        )}
+      >
         {players.map((p) => (
           <Link
             href={`/players/${p.id}`}

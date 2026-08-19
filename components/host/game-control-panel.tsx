@@ -118,7 +118,7 @@ export function GameControlPanel({ game }: { game: Game }) {
         <div className="flex flex-col gap-3 rounded-lg border border-gold/30 bg-gold/5 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Dealer</span>
-            <Select value={dealerId ?? undefined} onValueChange={(v) => setDealerId(v)}>
+            <Select value={dealerId ?? ""} onValueChange={(v) => setDealerId(v || null)}>
               <SelectTrigger size="sm" className="min-w-36">
                 <SelectValue placeholder="None" />
               </SelectTrigger>

@@ -251,6 +251,11 @@ export interface Database {
         Returns: PlayerHoleCardRow[];
       };
       clear_hole_cards: { Args: { p_hand_id: string; p_player_id: string }; Returns: undefined };
+      submit_my_hole_cards: {
+        Args: { p_hand_id: string; p_cards: string[] };
+        Returns: PlayerHoleCardRow[];
+      };
+      clear_my_hole_cards: { Args: { p_hand_id: string }; Returns: undefined };
       start_next_hand: {
         Args: { p_game_id: string; p_dealer_player_id: string | null };
         Returns: HandRow;

@@ -144,7 +144,7 @@ export function SettleHandPanel() {
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label>Winner</Label>
-              <Select value={winnerId ?? undefined} onValueChange={(v) => setWinnerId(v)}>
+              <Select value={winnerId ?? ""} onValueChange={(v) => setWinnerId(v || null)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Pick winner" />
                 </SelectTrigger>

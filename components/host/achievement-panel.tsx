@@ -75,7 +75,7 @@ export function AchievementPanel({ game }: { game: Game }) {
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
           <Label>Player</Label>
-          <Select value={playerId ?? undefined} onValueChange={(v) => setPlayerId(v)}>
+          <Select value={playerId ?? ""} onValueChange={(v) => setPlayerId(v || null)}>
             <SelectTrigger className="w-full sm:w-64">
               <SelectValue placeholder="Pick a player" />
             </SelectTrigger>

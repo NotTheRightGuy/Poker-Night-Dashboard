@@ -13,9 +13,12 @@ import { useCurrentHand } from "@/lib/game/selectors";
 import { clearHoleCards, dealHoleCards } from "@/lib/game/actions";
 import { createClient } from "@/lib/supabase/client";
 
-// Host-only "see and deal every hole card" panel for the hand currently in
-// progress. RLS grants an authenticated host session every player's hole
-// cards, so `useGame().holeCards` already contains everything needed here.
+// Players enter their own hole cards from the public app now (see
+// components/game/my-hand-panel.tsx) — this panel is the host-side fallback:
+// use it to check what everyone has, or to fix/enter a hand on someone's
+// behalf if they can't do it themselves (dead phone, needs help, etc). RLS
+// grants an authenticated host session every player's hole cards, so
+// `useGame().holeCards` already contains everything needed here.
 export function HoleCardManager() {
   const supabase = useMemo(() => createClient(), []);
   const { players, holeCards, communityCards } = useGame();
@@ -25,10 +28,10 @@ export function HoleCardManager() {
     return (
       <Card>
         <CardHeader>
-          <SectionHeading eyebrow="Cards" title="Hole Cards" />
+          <SectionHeading eyebrow="Cards — host override" title="Hole Cards" />
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No hand in progress — start the next hand to deal cards.</p>
+          <p className="text-sm text-muted-foreground">No hand in progress yet.</p>
         </CardContent>
       </Card>
     );
@@ -59,7 +62,11 @@ export function HoleCardManager() {
   return (
     <Card>
       <CardHeader>
-        <SectionHeading eyebrow="Cards" title={`Hole Cards — Hand #${currentHand.hand_number}`} />
+        <SectionHeading eyebrow="Cards — host override" title={`Hole Cards — Hand #${currentHand.hand_number}`} />
+        <p className="text-xs text-muted-foreground">
+          Players enter their own cards from their phone. Use this only to check what everyone has, or to enter/fix a
+          hand for someone who can&apos;t do it themselves.
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {activePlayers.length === 0 && <p className="text-sm text-muted-foreground">No players to deal to yet.</p>}
