@@ -24,7 +24,24 @@ function seatStyle(index: number, total: number): React.CSSProperties {
   return { left: `${left}%`, top: `${top}%` };
 }
 
-function SeatCard({ player, compact, isMe }: { player: Player; compact: boolean; isMe: boolean }) {
+// A small dot on the avatar, like an "online" indicator — green means
+// someone has actually claimed this seat and is following along on their
+// own device; no dot means the host added them but nobody's claimed it yet.
+function ClaimedAvatar({ name, dimmed, claimed, size }: { name: string; dimmed?: boolean; claimed: boolean; size: "sm" | "md" }) {
+  return (
+    <div className="relative">
+      <PlayerAvatar name={name} size={size} dimmed={dimmed} />
+      {claimed && (
+        <span
+          className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-card bg-chart-3"
+          title="Claimed"
+        />
+      )}
+    </div>
+  );
+}
+
+function SeatCard({ player, compact, isMe, claimed }: { player: Player; compact: boolean; isMe: boolean; claimed: boolean }) {
   return (
     <Link
       href={`/players/${player.id}`}
@@ -35,7 +52,7 @@ function SeatCard({ player, compact, isMe }: { player: Player; compact: boolean;
         isMe && "ring-2 ring-gold",
       )}
     >
-      <PlayerAvatar name={player.display_name} size="sm" dimmed={player.status === "eliminated"} />
+      <ClaimedAvatar name={player.display_name} dimmed={player.status === "eliminated"} claimed={claimed} size="sm" />
       <span className={cn("truncate font-semibold text-foreground", compact ? "max-w-14 text-[0.65rem]" : "max-w-20 text-xs")}>
         {player.display_name}
       </span>
@@ -46,7 +63,7 @@ function SeatCard({ player, compact, isMe }: { player: Player; compact: boolean;
 }
 
 export function PlayerTable() {
-  const { players } = useGame();
+  const { players, playerClaims } = useGame();
   const myPlayer = useMyPlayer();
 
   if (players.length === 0) {
@@ -57,6 +74,7 @@ export function PlayerTable() {
     );
   }
 
+  const claimedPlayerIds = new Set(playerClaims.filter((c) => !c.released_at).map((c) => c.player_id));
   const total = players.length;
   const showOvalTable = total <= OVAL_TABLE_MAX_PLAYERS;
   const compact = total > 6;
@@ -69,7 +87,7 @@ export function PlayerTable() {
         <div className="relative mx-auto hidden aspect-[16/11] w-full max-w-2xl rounded-[50%] border-4 border-gold/25 bg-felt shadow-[inset_0_0_60px_rgba(0,0,0,0.5)] sm:block">
           {players.map((p, i) => (
             <div key={p.id} style={seatStyle(i, total)}>
-              <SeatCard player={p} compact={compact} isMe={myPlayer?.id === p.id} />
+              <SeatCard player={p} compact={compact} isMe={myPlayer?.id === p.id} claimed={claimedPlayerIds.has(p.id)} />
             </div>
           ))}
         </div>
@@ -84,25 +102,31 @@ export function PlayerTable() {
           showOvalTable ? "sm:hidden" : "sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
         )}
       >
-        {players.map((p) => (
-          <Link
-            href={`/players/${p.id}`}
-            key={p.id}
-            className={cn(
-              "flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-3 text-center",
-              p.status === "eliminated" && "opacity-50",
-              myPlayer?.id === p.id && "ring-2 ring-gold",
-            )}
-          >
-            <PlayerAvatar name={p.display_name} size="md" dimmed={p.status === "eliminated"} />
-            <span className="truncate text-sm font-semibold text-foreground">{p.display_name}</span>
-            <PlayerStatusBadge status={p.status} />
-            <div className="flex flex-wrap justify-center gap-1">
-              <ChipStat value={p.chip_count} size="sm" />
-              <XpStat value={p.xp_total} size="sm" />
-            </div>
-          </Link>
-        ))}
+        {players.map((p) => {
+          const claimed = claimedPlayerIds.has(p.id);
+          return (
+            <Link
+              href={`/players/${p.id}`}
+              key={p.id}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-3 text-center",
+                p.status === "eliminated" && "opacity-50",
+                myPlayer?.id === p.id && "ring-2 ring-gold",
+              )}
+            >
+              <ClaimedAvatar name={p.display_name} dimmed={p.status === "eliminated"} claimed={claimed} size="md" />
+              <span className="truncate text-sm font-semibold text-foreground">{p.display_name}</span>
+              <span className={cn("text-[0.65rem] uppercase tracking-wide", claimed ? "text-chart-3" : "text-muted-foreground")}>
+                {claimed ? "Claimed" : "Unclaimed"}
+              </span>
+              <PlayerStatusBadge status={p.status} />
+              <div className="flex flex-wrap justify-center gap-1">
+                <ChipStat value={p.chip_count} size="sm" />
+                <XpStat value={p.xp_total} size="sm" />
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

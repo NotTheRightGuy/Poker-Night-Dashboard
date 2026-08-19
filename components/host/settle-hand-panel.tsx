@@ -14,7 +14,23 @@ import { useCurrentHand } from "@/lib/game/selectors";
 import { awardPot, awardXp } from "@/lib/game/actions";
 import { createClient } from "@/lib/supabase/client";
 import { evaluateHand, type HandCategory } from "@/lib/poker/evaluator";
-import { POKER_XP_RULES } from "@/lib/game/xpRules";
+import { HAND_RANKINGS, POKER_XP_RULES } from "@/lib/game/xpRules";
+
+// Maps the evaluator's category to one of the 10 canonical names in
+// HAND_RANKINGS, so an auto-detected hand can preselect the dropdown below
+// instead of the host having to type anything.
+const CATEGORY_TO_HAND_NAME: Record<HandCategory, string> = {
+  royal_flush: "Royal Flush",
+  straight_flush: "Straight Flush",
+  four_of_a_kind: "Four of a Kind",
+  full_house: "Full House",
+  flush: "Flush",
+  straight: "Straight",
+  three_of_a_kind: "Three of a Kind",
+  two_pair: "Two Pair",
+  pair: "One Pair",
+  high_card: "High Card",
+};
 
 // Not every hand category has a dedicated §13 rule (e.g. two pair / three of
 // a kind / straight flush / high card fall back to the generic "Win a hand"
@@ -56,8 +72,40 @@ export function SettleHandPanel() {
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [potAmount, setPotAmount] = useState(0);
   const [handName, setHandName] = useState("");
+  const [handNameTouched, setHandNameTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [settled, setSettled] = useState<SettledInfo | null>(null);
+
+  const handId = currentHand?.id;
+  const winner = winnerId ? players.find((p) => p.id === winnerId) ?? null : null;
+  const handCommunityCards = handId ? communityCards.filter((c) => c.hand_id === handId).map((c) => c.card) : [];
+
+  let suggestion: { detailedName: string; canonicalName: string; reason: string | null; amount: number | null } | null = null;
+  if (winner && handId) {
+    const winnerHoleCards = holeCards
+      .filter((c) => c.hand_id === handId && c.player_id === winner.id)
+      .map((c) => c.card);
+    if (winnerHoleCards.length === 2 && handCommunityCards.length >= 3) {
+      try {
+        const evaluation = evaluateHand(winnerHoleCards, handCommunityCards);
+        const rule = suggestXpRule(evaluation.category, evaluation.tiebreak);
+        suggestion = {
+          detailedName: evaluation.name,
+          canonicalName: CATEGORY_TO_HAND_NAME[evaluation.category],
+          reason: rule?.reason ?? null,
+          amount: rule?.amount ?? null,
+        };
+      } catch {
+        suggestion = null;
+      }
+    }
+  }
+
+  // Preselect the dropdown from the auto-detected hand, but only until the
+  // host actually touches it themselves — never fight their manual choice.
+  // Derived directly during render (no effect needed) since it's a pure
+  // function of existing state/props.
+  const effectiveHandName = handNameTouched ? handName : suggestion?.canonicalName ?? "";
 
   if (!currentHand) {
     return (
@@ -72,29 +120,10 @@ export function SettleHandPanel() {
     );
   }
 
-  const handId = currentHand.id;
+  const handIdSafe = currentHand.id;
   const gameId = currentHand.game_id;
   const handNumber = currentHand.hand_number;
-
   const eligiblePlayers = players.filter((p) => p.status === "active" || p.status === "all_in");
-  const handCommunityCards = communityCards.filter((c) => c.hand_id === handId).map((c) => c.card);
-  const winner = winnerId ? players.find((p) => p.id === winnerId) ?? null : null;
-
-  let suggestion: { name: string; reason: string | null; amount: number | null } | null = null;
-  if (winner) {
-    const winnerHoleCards = holeCards
-      .filter((c) => c.hand_id === handId && c.player_id === winner.id)
-      .map((c) => c.card);
-    if (winnerHoleCards.length === 2 && handCommunityCards.length >= 3) {
-      try {
-        const evaluation = evaluateHand(winnerHoleCards, handCommunityCards);
-        const rule = suggestXpRule(evaluation.category, evaluation.tiebreak);
-        suggestion = { name: evaluation.name, reason: rule?.reason ?? null, amount: rule?.amount ?? null };
-      } catch {
-        suggestion = null;
-      }
-    }
-  }
 
   async function handleSettle(e: React.FormEvent) {
     e.preventDefault();
@@ -104,10 +133,10 @@ export function SettleHandPanel() {
     }
     setSubmitting(true);
     try {
-      await awardPot(supabase, handId, winnerId, potAmount, handName.trim() || undefined);
+      await awardPot(supabase, handIdSafe, winnerId, potAmount, effectiveHandName || undefined);
       toast.success("Pot awarded");
       setSettled({
-        handId,
+        handId: handIdSafe,
         gameId,
         winnerId,
         winnerName: winner.display_name,
@@ -117,6 +146,7 @@ export function SettleHandPanel() {
       setWinnerId(null);
       setPotAmount(0);
       setHandName("");
+      setHandNameTouched(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to award pot");
     } finally {
@@ -168,13 +198,25 @@ export function SettleHandPanel() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="hand-name">Winning hand (optional)</Label>
-              <Input
-                id="hand-name"
-                value={handName}
-                onChange={(e) => setHandName(e.target.value)}
-                placeholder={suggestion?.name ?? "e.g. Full House, Kings over Queens"}
-              />
+              <Label>Winning hand (optional)</Label>
+              <Select
+                value={effectiveHandName}
+                onValueChange={(v) => {
+                  setHandName(v ?? "");
+                  setHandNameTouched(true);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pick a hand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {HAND_RANKINGS.map((h) => (
+                    <SelectItem key={h.name} value={h.name}>
+                      {h.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <Button
@@ -190,7 +232,7 @@ export function SettleHandPanel() {
 
         {suggestion && !settled && (
           <p className="text-xs text-muted-foreground">
-            Suggestion: {winner?.display_name} currently has <span className="text-foreground">{suggestion.name}</span>
+            Detected: {winner?.display_name} currently has <span className="text-foreground">{suggestion.detailedName}</span>
             {suggestion.reason && (
               <>
                 {" "}

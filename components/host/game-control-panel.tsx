@@ -9,22 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { GameStatusBadge } from "@/components/game/status-badge";
 import { SectionHeading } from "@/components/game/section-heading";
 import { useGame } from "@/lib/game/provider";
-import { setGamePhase, setGameStatus, startNextHand } from "@/lib/game/actions";
+import { setGamePhase, startNextHand } from "@/lib/game/actions";
 import { createClient } from "@/lib/supabase/client";
-import type { Game, GamePhase, GameStatus } from "@/lib/game/types";
+import type { Game, GamePhase } from "@/lib/game/types";
 
-const STATUS_FLOW: GameStatus[] = ["not_started", "registration", "live", "break", "final_table", "finished"];
 const PHASE_FLOW: GamePhase[] = ["preflop", "flop", "turn", "river", "showdown"];
-
-const STATUS_LABEL: Record<GameStatus, string> = {
-  not_started: "Not Started",
-  registration: "Registration",
-  live: "Live",
-  break: "Break",
-  final_table: "Final Table",
-  finished: "Finished",
-};
-
 const PHASE_LABEL: Record<GamePhase, string> = {
   preflop: "Preflop",
   flop: "Flop",
@@ -33,6 +22,10 @@ const PHASE_LABEL: Record<GamePhase, string> = {
   showdown: "Showdown",
 };
 
+// The per-hand controls — dealing a street already advances the phase
+// automatically (see community-card-manager.tsx), these buttons are just a
+// manual override/correction if you need one, plus the dealer picker and the
+// "start next hand" action, which is the one thing every hand needs.
 export function GameControlPanel({ game }: { game: Game }) {
   const supabase = useMemo(() => createClient(), []);
   const { players } = useGame();
@@ -40,15 +33,6 @@ export function GameControlPanel({ game }: { game: Game }) {
   const [startingHand, setStartingHand] = useState(false);
 
   const eligibleDealers = players.filter((p) => p.status !== "eliminated");
-
-  async function handleStatus(status: GameStatus) {
-    if (status === game.status) return;
-    try {
-      await setGameStatus(supabase, game.id, status);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update status");
-    }
-  }
 
   async function handlePhase(phase: GamePhase) {
     if (phase === game.current_phase) return;
@@ -75,29 +59,12 @@ export function GameControlPanel({ game }: { game: Game }) {
     <Card>
       <CardHeader>
         <SectionHeading
-          eyebrow="Game Control"
+          eyebrow="This Hand"
           title={`Hand #${game.current_hand_number}`}
           action={<GameStatusBadge status={game.status} />}
         />
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</p>
-          <div className="flex flex-wrap gap-2">
-            {STATUS_FLOW.map((status) => (
-              <Button
-                key={status}
-                type="button"
-                size="sm"
-                variant={status === game.status ? "default" : "outline"}
-                onClick={() => handleStatus(status)}
-              >
-                {STATUS_LABEL[status]}
-              </Button>
-            ))}
-          </div>
-        </div>
-
+      <CardContent className="space-y-4">
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Phase</p>
           <div className="flex flex-wrap gap-2">

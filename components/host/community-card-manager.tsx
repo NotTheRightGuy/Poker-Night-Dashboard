@@ -9,7 +9,7 @@ import { CardPicker } from "@/components/game/card-picker";
 import { SectionHeading } from "@/components/game/section-heading";
 import { useGame } from "@/lib/game/provider";
 import { useCurrentHand } from "@/lib/game/selectors";
-import { dealCommunityCards, removeLastCommunityCard, resetBoard } from "@/lib/game/actions";
+import { dealCommunityCards, removeLastCommunityCard, resetBoard, setGamePhase } from "@/lib/game/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { Street } from "@/lib/game/types";
 
@@ -17,9 +17,11 @@ import type { Street } from "@/lib/game/types";
 // flop=3/turn=1/river=1-in-order rule server-side, so the picker "disabled"
 // states here are a guided UX on top of that, not the actual enforcement —
 // any mistake still surfaces as a toast from the RPC's own error message.
+// Dealing a street also advances games.current_phase to match it, so the
+// host never has to separately remember to click a phase button too.
 export function CommunityCardManager() {
   const supabase = useMemo(() => createClient(), []);
-  const { holeCards, communityCards } = useGame();
+  const { game, holeCards, communityCards } = useGame();
   const currentHand = useCurrentHand();
 
   if (!currentHand) {
@@ -53,6 +55,7 @@ export function CommunityCardManager() {
   async function handleDeal(street: Street, cards: string[]) {
     try {
       await dealCommunityCards(supabase, handId, street, cards);
+      if (game) await setGamePhase(supabase, game.id, street);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `Failed to deal the ${street}`);
     }

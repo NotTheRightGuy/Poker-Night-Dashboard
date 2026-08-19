@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HostHeader } from "@/components/host/host-header";
 import { NoGameSetup } from "@/components/host/no-game-setup";
 import { GameControlPanel } from "@/components/host/game-control-panel";
+import { EventControlPanel } from "@/components/host/event-control-panel";
+import { HandPlayerStatus } from "@/components/host/hand-player-status";
 import { PlayerManager } from "@/components/host/player-manager";
 import { HoleCardManager } from "@/components/host/hole-card-manager";
 import { CommunityCardManager } from "@/components/host/community-card-manager";
@@ -19,9 +21,13 @@ import { useGame } from "@/lib/game/provider";
 
 // The /host control room. Auth is already enforced server-side by
 // app/host/(dashboard)/layout.tsx before this ever renders, so this file is
-// pure UI: no game yet -> setup form, otherwise the full dashboard organized
-// into tabs (one tap to reach any section) plus a persistent quick action
-// bar for the handful of highest-frequency actions.
+// pure UI: no game yet -> setup form, otherwise two tabs —
+// "This Hand" bundles every action you touch on every single hand (mark
+// folds, deal community cards, settle the pot) in one scroll, so there's no
+// tab-hopping mid-hand. "Setup" holds everything else: roster management,
+// manual chip/XP corrections, chaos/power-ups/achievements, event status,
+// undo/reset. Plus a persistent quick action bar for the handful of
+// highest-frequency single-tap actions regardless of tab.
 export default function HostDashboardPage() {
   const { game, loading } = useGame();
 
@@ -40,38 +46,28 @@ export default function HostDashboardPage() {
         {!game ? (
           <NoGameSetup />
         ) : (
-          <Tabs defaultValue="control" className="gap-4">
+          <Tabs defaultValue="hand" className="gap-4">
             <TabsList className="flex-wrap">
-              <TabsTrigger value="control">Control</TabsTrigger>
-              <TabsTrigger value="players">Players</TabsTrigger>
-              <TabsTrigger value="cards">Cards</TabsTrigger>
-              <TabsTrigger value="ledger">Chips &amp; XP</TabsTrigger>
-              <TabsTrigger value="extras">Extras</TabsTrigger>
+              <TabsTrigger value="hand">This Hand</TabsTrigger>
+              <TabsTrigger value="setup">Setup</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="control" className="space-y-4">
+            <TabsContent value="hand" className="space-y-4">
               <GameControlPanel game={game} />
-              <SettleHandPanel />
-              <UndoResetBar game={game} />
-            </TabsContent>
-
-            <TabsContent value="players">
-              <PlayerManager game={game} />
-            </TabsContent>
-
-            <TabsContent value="cards" className="space-y-4">
-              <HoleCardManager />
+              <HandPlayerStatus />
               <CommunityCardManager />
+              <SettleHandPanel />
             </TabsContent>
 
-            <TabsContent value="ledger">
+            <TabsContent value="setup" className="space-y-4">
+              <EventControlPanel game={game} />
+              <PlayerManager game={game} />
+              <HoleCardManager />
               <ChipXpManager game={game} />
-            </TabsContent>
-
-            <TabsContent value="extras" className="space-y-4">
               <AchievementPanel game={game} />
               <ChaosPanel game={game} />
               <PowerupPanel game={game} />
+              <UndoResetBar game={game} />
             </TabsContent>
           </Tabs>
         )}

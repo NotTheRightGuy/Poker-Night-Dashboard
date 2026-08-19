@@ -15,17 +15,8 @@ import { ChipStat, XpStat } from "@/components/game/stat-pill";
 import { useGame } from "@/lib/game/provider";
 import { eliminatePlayer, hostReleaseClaim, removePlayer, restorePlayer, updatePlayer } from "@/lib/game/actions";
 import { createClient } from "@/lib/supabase/client";
-import type { Player, PlayerStatus } from "@/lib/game/types";
+import type { Player } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-
-const STATUS_OPTIONS: PlayerStatus[] = ["active", "folded", "all_in", "away"];
-const STATUS_LABEL: Record<PlayerStatus, string> = {
-  active: "Active",
-  folded: "Folded",
-  all_in: "All-In",
-  eliminated: "Eliminated",
-  away: "Away",
-};
 
 // One row in the roster — everything the host needs to do to a single
 // player, inline, with the destructive/rarer actions tucked behind a small
@@ -97,19 +88,6 @@ export function PlayerRow({ player }: { player: Player }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {STATUS_OPTIONS.map((status) => (
-            <Button
-              key={status}
-              type="button"
-              size="xs"
-              variant={player.status === status ? "default" : "outline"}
-              disabled={busy || player.status === "eliminated"}
-              onClick={() => run(() => updatePlayer(supabase, player.id, { status }))}
-            >
-              {STATUS_LABEL[status]}
-            </Button>
-          ))}
-
           {player.status === "eliminated" ? (
             <Button
               type="button"
