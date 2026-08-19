@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Undo2 } from "lucide-react";
+import { AlertTriangle, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -17,20 +17,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionHeading } from "@/components/game/section-heading";
-import { setGameStatus, undoLastAction } from "@/lib/game/actions";
+import { resetHands, setGameStatus, undoLastAction } from "@/lib/game/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { Game } from "@/lib/game/types";
 
-// "Reset" here only ever means "set status back to not_started" — there is
-// no destructive DB wipe RPC, and history (players, hands, transactions)
-// must be preserved, so this is a soft reset of the game flow, gated behind
-// a type-the-game-name confirmation rather than a single click.
+// "Reset Game" only ever means "set status back to not_started" — there is
+// no destructive DB wipe RPC for it, and history (players, hands,
+// transactions) must be preserved, so it's a soft reset of the game flow,
+// gated behind a type-the-game-name confirmation rather than a single click.
+// "Reset Hands" is narrower but genuinely destructive (it deletes hand
+// records so numbering restarts at #1) — same confirmation pattern, see
+// reset_hands() in 0008_reset_hands.sql for exactly what it does and doesn't touch.
 export function UndoResetBar({ game }: { game: Game }) {
   const supabase = useMemo(() => createClient(), []);
   const [undoing, setUndoing] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [resetHandsOpen, setResetHandsOpen] = useState(false);
+  const [resetHandsConfirmText, setResetHandsConfirmText] = useState("");
+  const [resettingHands, setResettingHands] = useState(false);
 
   async function handleUndo() {
     setUndoing(true);
@@ -55,6 +61,20 @@ export function UndoResetBar({ game }: { game: Game }) {
       toast.error(err instanceof Error ? err.message : "Failed to reset game");
     } finally {
       setResetting(false);
+    }
+  }
+
+  async function handleResetHands() {
+    setResettingHands(true);
+    try {
+      await resetHands(supabase, game.id);
+      toast.success("Hands cleared — next hand will be #1");
+      setResetHandsOpen(false);
+      setResetHandsConfirmText("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reset hands");
+    } finally {
+      setResettingHands(false);
     }
   }
 
@@ -119,6 +139,58 @@ export function UndoResetBar({ game }: { game: Game }) {
                   onClick={handleReset}
                 >
                   Confirm Reset
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+          <div>
+            <p className="text-sm font-medium text-destructive">Reset Hands</p>
+            <p className="text-xs text-muted-foreground">
+              Clears every hand, board, and hole card so the next hand starts back at #1. Chips, XP, and players are left
+              exactly as they are — this only restarts hand numbering.
+            </p>
+          </div>
+          <Dialog
+            open={resetHandsOpen}
+            onOpenChange={(next) => {
+              setResetHandsOpen(next);
+              if (!next) setResetHandsConfirmText("");
+            }}
+          >
+            <DialogTrigger render={<Button type="button" variant="destructive" />}>
+              <RotateCcw className="size-4" />
+              Reset Hands
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reset hands for “{game.name}”?</DialogTitle>
+                <DialogDescription>
+                  Type the game name below to confirm. This permanently deletes all hand, board, and hole card records —
+                  chip counts, XP, and players are not affected.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-reset-hands">Type “{game.name}” to confirm</Label>
+                <Input
+                  id="confirm-reset-hands"
+                  value={resetHandsConfirmText}
+                  onChange={(e) => setResetHandsConfirmText(e.target.value)}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setResetHandsOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={resetHandsConfirmText !== game.name || resettingHands}
+                  onClick={handleResetHands}
+                >
+                  Confirm Reset Hands
                 </Button>
               </DialogFooter>
             </DialogContent>

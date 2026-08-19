@@ -41,10 +41,23 @@ function ClaimedAvatar({ name, dimmed, claimed, size }: { name: string; dimmed?:
   );
 }
 
-function SeatCard({ player, compact, isMe, claimed }: { player: Player; compact: boolean; isMe: boolean; claimed: boolean }) {
+function SeatCard({
+  player,
+  compact,
+  isMe,
+  claimed,
+  style,
+}: {
+  player: Player;
+  compact: boolean;
+  isMe: boolean;
+  claimed: boolean;
+  style: React.CSSProperties;
+}) {
   return (
     <Link
       href={`/players/${player.id}`}
+      style={style}
       className={cn(
         "absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-xl border border-white/10 bg-card/90 text-center backdrop-blur transition hover:border-gold/50",
         compact ? "p-1.5" : "p-2",
@@ -86,9 +99,14 @@ export function PlayerTable() {
       {showOvalTable && (
         <div className="relative mx-auto hidden aspect-[16/11] w-full max-w-2xl rounded-[50%] border-4 border-gold/25 bg-felt shadow-[inset_0_0_60px_rgba(0,0,0,0.5)] sm:block">
           {players.map((p, i) => (
-            <div key={p.id} style={seatStyle(i, total)}>
-              <SeatCard player={p} compact={compact} isMe={myPlayer?.id === p.id} claimed={claimedPlayerIds.has(p.id)} />
-            </div>
+            <SeatCard
+              key={p.id}
+              player={p}
+              compact={compact}
+              isMe={myPlayer?.id === p.id}
+              claimed={claimedPlayerIds.has(p.id)}
+              style={seatStyle(i, total)}
+            />
           ))}
         </div>
       )}

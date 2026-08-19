@@ -255,3 +255,10 @@ export async function undoLastAction(supabase: Client, gameId: string) {
   const { error } = await supabase.rpc("undo_last_action", { p_game_id: gameId });
   if (error) throw new Error(error.message);
 }
+
+// Clears hand records (and cascades) so the next hand starts back at #1.
+// Never touches chip_count/xp_total — see 0008_reset_hands.sql.
+export async function resetHands(supabase: Client, gameId: string) {
+  const { error } = await supabase.rpc("reset_hands", { p_game_id: gameId });
+  if (error) throw new Error(error.message);
+}

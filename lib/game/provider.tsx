@@ -180,6 +180,34 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     let backoffTimer: ReturnType<typeof setTimeout> | null = null;
+    let offlineDisplayTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Websockets drop for lots of ordinary reasons — a backgrounded browser
+    // tab gets throttled, a phone screen locks, wifi blips for a second —
+    // and the client reconnects automatically within a second or two almost
+    // every time. Flashing "Connection lost" for each of those looks like a
+    // real problem when nothing was actually lost. Only show it if a drop
+    // hasn't resolved within a couple of seconds; cancel the timer the
+    // moment we're back, so brief blips never reach the screen at all.
+    function handleChannelStatus(status: string, onDrop: () => void) {
+      if (cancelled) return;
+      if (status === "SUBSCRIBED") {
+        retryRef.current = 0;
+        if (offlineDisplayTimer) {
+          clearTimeout(offlineDisplayTimer);
+          offlineDisplayTimer = null;
+        }
+        setConnectionStatus("live");
+      } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        if (!offlineDisplayTimer) {
+          offlineDisplayTimer = setTimeout(() => {
+            offlineDisplayTimer = null;
+            if (!cancelled) setConnectionStatus("offline");
+          }, 2000);
+        }
+        onDrop();
+      }
+    }
 
     function applyChange(key: keyof GameState, payload: RealtimePostgresChangesPayload<Record<string, unknown>>) {
       setState((prev) => {
@@ -244,14 +272,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           applyChange("achievements", payload),
         )
         .subscribe((status) => {
-          if (cancelled) return;
-          if (status === "SUBSCRIBED") {
-            retryRef.current = 0;
-            setConnectionStatus("live");
-          } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            setConnectionStatus("offline");
-            scheduleReconnect(gameId);
-          }
+          handleChannelStatus(status, () => scheduleReconnect(gameId));
         });
 
       channelRef.current = channel;
@@ -289,14 +310,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       );
 
       channel.subscribe((status) => {
-        if (cancelled) return;
-        if (status === "SUBSCRIBED") {
-          retryRef.current = 0;
-          setConnectionStatus("live");
-        } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setConnectionStatus("offline");
-          scheduleReconnectWatch();
-        }
+        handleChannelStatus(status, () => scheduleReconnectWatch());
       });
 
       channelRef.current = channel;
@@ -320,9 +334,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const gameId = await fetchSnapshot();
       if (cancelled) return;
 
-      const { data: userData } = await supabase.auth.getUser();
-      if (!cancelled) setUserId(userData.user?.id ?? null);
-
       if (gameId) {
         subscribe(gameId);
       } else {
@@ -332,10 +343,27 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     bootstrap();
 
+    // A one-time getUser() at bootstrap isn't enough: claimPlayer() may call
+    // signInAnonymously() well after this provider already mounted (the very
+    // first time someone selects their name), which creates a brand-new
+    // session out from under a stale `userId`. Without reacting to that,
+    // `myClaim` never matches the just-created claim and the private hand
+    // panel silently never appears until a full page reload. Subscribing
+    // here fires immediately with whatever session already exists, and again
+    // on every subsequent sign-in/sign-out, so `userId` — and therefore
+    // `myClaim` — stays correct without any manual refresh.
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled) setUserId(session?.user?.id ?? null);
+    });
+
     return () => {
       cancelled = true;
       if (backoffTimer) clearTimeout(backoffTimer);
+      if (offlineDisplayTimer) clearTimeout(offlineDisplayTimer);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
+      authSubscription.unsubscribe();
     };
   }, [supabase, fetchSnapshot]);
 

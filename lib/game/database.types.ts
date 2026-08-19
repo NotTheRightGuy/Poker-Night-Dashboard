@@ -315,6 +315,7 @@ export interface Database {
         Returns: PlayerAchievementRow;
       };
       undo_last_action: { Args: { p_game_id: string }; Returns: undefined };
+      reset_hands: { Args: { p_game_id: string }; Returns: undefined };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

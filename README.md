@@ -25,7 +25,7 @@ In **Authentication → Providers**, enable **Anonymous sign-ins** — this is h
 
 ## 2. Run the database migrations
 
-Apply the six files in `supabase/migrations/` **in order** — either paste each into the Supabase SQL Editor, or with the Supabase CLI:
+Apply the seven files in `supabase/migrations/` **in order** — either paste each into the Supabase SQL Editor, or with the Supabase CLI:
 
 ```bash
 npx supabase link --project-ref <your-project-ref>
@@ -38,6 +38,7 @@ npx supabase db push
 - `0004_functions_triggers.sql` — every RPC the app calls (dealing cards, awarding pots/chips/XP, triggering chaos, undo) plus the triggers that maintain cached chip/XP balances and the activity-feed log.
 - `0005_enable_realtime.sql` — **easy to forget, and the app looks broken without it**: RLS controls who can *read* a row, but a `postgres_changes` subscription only fires for tables added to the `supabase_realtime` publication, which is a separate step. Without this migration, every screen only ever shows what was on the page at load — nothing updates live until you refresh.
 - `0006_player_hole_card_submission.sql` — lets a player submit their own hole cards (`submit_my_hole_cards`/`clear_my_hole_cards`), scoped server-side to whichever player their session has claimed. The host's `deal_hole_cards`/`clear_hole_cards` from 0004 still work too, as a manual override.
+- `0007_replica_identity_full.sql` — **also easy to miss, and causes a subtle bug**: fixes edited hole cards / removed community cards / removed players appearing to "pile up" client-side instead of replacing the old ones. `players`, `player_hole_cards`, and `community_cards` are filtered on `game_id` in realtime subscriptions, but `game_id` isn't their primary key — Postgres's default replication settings omit non-primary-key columns from a DELETE's old-row data, so Realtime has nothing to filter on and silently drops the event. This sets `REPLICA IDENTITY FULL` on those three tables so DELETE events actually arrive.
 
 ## 3. Create the host account
 
