@@ -92,10 +92,13 @@ export async function restorePlayer(supabase: Client, playerId: string) {
 
 // ── Player claims (anonymous-auth identity) ─────────────────────────────────
 export async function claimPlayer(supabase: Client, gameId: string, playerId: string) {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw new Error(userError.message);
+  // getUser() returns an AuthSessionMissingError for a brand-new visitor with
+  // no session at all yet — that's expected, not a real failure, so it must
+  // NOT abort here; it just means we fall through to signInAnonymously()
+  // below like any other "not signed in yet" case.
+  const { data: userData } = await supabase.auth.getUser();
 
-  let userId: string | undefined = userData.user?.id;
+  let userId: string | undefined = userData?.user?.id;
   if (!userId) {
     const { data: anon, error: anonError } = await supabase.auth.signInAnonymously();
     if (anonError) throw new Error(anonError.message);
